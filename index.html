@@ -6,6 +6,8 @@
 <title>府城寺廟巡禮</title>
 <meta name="description" content="用開源地圖認識台南最有名的寺廟">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -19,6 +21,7 @@
   <p>台南是台灣最早開發的城市，廟宇密度冠於全台。點選地圖上的標記，認識每間廟的故事與樣貌。</p>
 </section>
 
+<div class="controls"><div id="chips"></div><label class="osm"><input type="checkbox" id="osmToggle"> 顯示全台南市 OSM 寺廟（<span id="osmStatus">未載入</span>）</label></div>
 <main id="map-section" class="layout">
   <div id="map" aria-label="台南寺廟地圖"></div>
   <aside id="panel" aria-live="polite">
@@ -43,6 +46,7 @@
 <div id="lightbox" hidden><img alt=""><button aria-label="關閉">×</button></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script src="temples.js"></script>
 <script src="app.js"></script>
 </body>

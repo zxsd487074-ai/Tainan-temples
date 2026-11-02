@@ -34,3 +34,10 @@ footer{text-align:center;color:var(--muted);font-size:.8rem;padding:24px 16px;bo
 #lightbox img{max-width:95vw;max-height:90vh}
 #lightbox button{position:absolute;top:12px;right:16px;font-size:2rem;color:#fff;background:none;border:0;cursor:pointer}
 @media (max-width:800px){.layout{grid-template-columns:1fr}#map{height:55vh}#panel{height:auto;max-height:none}}
+
+.controls{max-width:1200px;margin:0 auto;padding:0 16px 12px}
+#chips{display:flex;flex-wrap:wrap;gap:8px}
+#chips button{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:99px;padding:4px 12px;font:inherit;font-size:.9rem;cursor:pointer}
+#chips button.on{background:var(--red);border-color:var(--red);color:#fff}
+.osm{display:block;margin-top:8px;font-size:.85rem;color:var(--muted)}
+#list h3{margin:12px 0 0;font-size:.95rem;color:var(--muted)}

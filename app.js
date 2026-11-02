@@ -6,6 +6,7 @@ L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
 const panel = document.getElementById('panel');
 const initialHTML = panel.innerHTML;
 const markers = {};
+let current = 'ALL';
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
 const icon = L.divIcon({className:'', html:'<div style="font-size:26px;filter:drop-shadow(0 1px 2px #0008)">⛩️</div>', iconSize:[28,28], iconAnchor:[14,24]});
@@ -18,10 +19,54 @@ TEMPLES.forEach(t => {
 
 function buildList() {
   const ul = document.getElementById('list');
-  ul.innerHTML = TEMPLES.map(t => `<li><button data-id="${t.id}">${esc(t.name)}<small>${esc(t.tag)}</small></button></li>`).join('');
+  let html = '';
+  Object.entries(REGIONS).forEach(([k, label]) => {
+    if (current !== 'ALL' && current !== k) return;
+    const items = TEMPLES.filter(t => t.region === k);
+    if (!items.length) return;
+    html += `<h3>${esc(label)}</h3>` + items.map(t => `<li><button data-id="${t.id}">${esc(t.name)}<small>${esc(t.tag)}</small></button></li>`).join('');
+  });
+  ul.innerHTML = html;
   ul.onclick = e => { const b = e.target.closest('button'); if (b) show(TEMPLES.find(t => t.id === b.dataset.id)); };
 }
 buildList();
+
+function setRegion(k) {
+  current = k;
+  document.querySelectorAll('#chips button').forEach(b => b.classList.toggle('on', b.dataset.r === k));
+  const items = TEMPLES.filter(t => k === 'ALL' || t.region === k);
+  TEMPLES.forEach(t => { const on = items.includes(t); markers[t.id][on ? 'addTo' : 'remove'](map); });
+  map.flyToBounds(L.latLngBounds(items.map(t => [t.lat, t.lng])).pad(.2), {duration:.8, maxZoom:15});
+  panel.innerHTML = initialHTML; buildList();
+}
+document.getElementById('chips').innerHTML = '<button data-r="ALL" class="on">全部</button>' +
+  Object.entries(REGIONS).map(([k, v]) => `<button data-r="${k}">${esc(v)}</button>`).join('');
+document.getElementById('chips').onclick = e => { const b = e.target.closest('button'); if (b) setRegion(b.dataset.r); };
+
+// 全台南市 OSM 寺廟（Overpass API，即時查詢）
+let osmLayer = null;
+document.getElementById('osmToggle').onchange = async e => {
+  const st = document.getElementById('osmStatus');
+  if (!e.target.checked) { if (osmLayer) map.removeLayer(osmLayer); st.textContent = '已隱藏'; return; }
+  if (osmLayer) { osmLayer.addTo(map); st.textContent = '已顯示'; return; }
+  st.textContent = '載入中…';
+  const q = '[out:json][timeout:60];area["name"="臺南市"]["boundary"="administrative"]["admin_level"="4"]->.a;nwr(area.a)["amenity"="place_of_worship"]["religion"~"taoist|buddhist|folk"]["name"];out center tags 4000;';
+  try {
+    const r = await fetch('https://overpass-api.de/api/interpreter', {method:'POST', body:'data=' + encodeURIComponent(q)});
+    const d = await r.json();
+    osmLayer = L.markerClusterGroup({chunkedLoading:true});
+    d.elements.forEach(el => {
+      const lat = el.lat ?? el.center?.lat, lng = el.lon ?? el.center?.lon;
+      if (lat == null) return;
+      const n = el.tags.name, link = `https://www.openstreetmap.org/${el.type}/${el.id}`;
+      L.circleMarker([lat, lng], {radius:6, color:'#a8321f', fillOpacity:.7})
+        .bindPopup(`<b>${esc(n)}</b><br>${esc(el.tags['name:en'] || '')}<br><a href="${link}" target="_blank" rel="noopener">OSM 詳情</a>`)
+        .addTo(osmLayer);
+    });
+    osmLayer.addTo(map);
+    st.textContent = `已顯示 ${osmLayer.getLayers().length} 間`;
+  } catch (err) { st.textContent = '載入失敗，請稍後再試'; e.target.checked = false; }
+};
 
 function show(t) {
   map.flyTo([t.lat, t.lng], 17, {duration: .8});
