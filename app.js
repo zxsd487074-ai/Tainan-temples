@@ -55,12 +55,12 @@ async function loadView() {
   if (map.getZoom() < 12) { stEl.textContent = '請放大地圖（縮放 12 以上）以載入'; return; }
   const b = map.getBounds();
   const bbox = [b.getSouth(), b.getWest(), b.getNorth(), b.getEast()].map(x => x.toFixed(4)).join(',');
-  const q = `[out:json][timeout:20];nwr["amenity"="place_of_worship"]["religion"~"taoist|buddhist|folk"]["name"](${bbox});out center tags qt 800;`;
-  loading = true; stEl.textContent = '載入中…';
+  const q = `[out:json][timeout:50];nwr["amenity"="place_of_worship"]["name"](${bbox});out center tags qt 1500;`;
+  loading = true; stEl.textContent = '載入中…（公共伺服器較慢，最多約 1 分鐘）';
   try {
-    const d = await Promise.any(OSM_EPS.map(u => fetch(u, {method:'POST', body:'data=' + encodeURIComponent(q), signal: AbortSignal.timeout(20000)})
+    const d = await Promise.any(OSM_EPS.map(u => fetch(u, {method:'POST', body:'data=' + encodeURIComponent(q), signal: AbortSignal.timeout(55000)})
       .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })));
-    d.elements.forEach(el => {
+    d.elements.filter(el => !/christian|muslim|jewish|hindu|sikh/.test(el.tags.religion || '')).forEach(el => {
       const key = el.type + el.id;
       if (seen.has(key)) return; seen.add(key);
       const lat = el.lat ?? el.center?.lat, lng = el.lon ?? el.center?.lon;
