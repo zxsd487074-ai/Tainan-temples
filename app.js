@@ -43,35 +43,44 @@ document.getElementById('chips').innerHTML = '<button data-r="ALL" class="on">�
   Object.entries(REGIONS).map(([k, v]) => `<button data-r="${k}">${esc(v)}</button>`).join('');
 document.getElementById('chips').onclick = e => { const b = e.target.closest('button'); if (b) setRegion(b.dataset.r); };
 
-// 全台南市 OSM 寺廟（Overpass API，即時查詢）
-let osmLayer = null;
-document.getElementById('osmToggle').onchange = async e => {
-  const st = document.getElementById('osmStatus');
-  if (!e.target.checked) { if (osmLayer) map.removeLayer(osmLayer); st.textContent = '已隱藏'; return; }
-  if (osmLayer) { osmLayer.addTo(map); st.textContent = '已顯示'; return; }
-  st.textContent = '載入中…';
-  const q = '[out:json][timeout:25];nwr["amenity"="place_of_worship"]["religion"~"taoist|buddhist|folk"]["name"](22.88,120.03,23.42,120.66);out center tags qt;';
-  const CK = 'osm-temples-v1';
+// 全台南市 OSM 寺廟：依目前畫面範圍即時載入（Overpass API）
+const osmLayer = L.markerClusterGroup({chunkedLoading:true});
+const seen = new Set();
+let osmOn = false, loading = false, timer = null;
+const OSM_EPS = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter', 'https://overpass.private.coffee/api/interpreter'];
+const stEl = document.getElementById('osmStatus');
+
+async function loadView() {
+  if (!osmOn || loading) return;
+  if (map.getZoom() < 12) { stEl.textContent = '請放大地圖（縮放 12 以上）以載入'; return; }
+  const b = map.getBounds();
+  const bbox = [b.getSouth(), b.getWest(), b.getNorth(), b.getEast()].map(x => x.toFixed(4)).join(',');
+  const q = `[out:json][timeout:20];nwr["amenity"="place_of_worship"]["religion"~"taoist|buddhist|folk"]["name"](${bbox});out center tags qt 800;`;
+  loading = true; stEl.textContent = '載入中…';
   try {
-    let d = null;
-    try { const c = JSON.parse(localStorage.getItem(CK)); if (c && Date.now() - c.t < 7 * 864e5) d = c.d; } catch (x) {}
-    if (!d) {
-      const eps = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'];
-      d = await Promise.any(eps.map(u => fetch(u, {method:'POST', body:'data=' + encodeURIComponent(q)}).then(r => { if (!r.ok) throw 0; return r.json(); })));
-      try { localStorage.setItem(CK, JSON.stringify({t: Date.now(), d})); } catch (x) {}
-    }
-    osmLayer = L.markerClusterGroup({chunkedLoading:true});
+    const d = await Promise.any(OSM_EPS.map(u => fetch(u, {method:'POST', body:'data=' + encodeURIComponent(q), signal: AbortSignal.timeout(20000)})
+      .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })));
     d.elements.forEach(el => {
+      const key = el.type + el.id;
+      if (seen.has(key)) return; seen.add(key);
       const lat = el.lat ?? el.center?.lat, lng = el.lon ?? el.center?.lon;
       if (lat == null) return;
-      const n = el.tags.name, link = `https://www.openstreetmap.org/${el.type}/${el.id}`;
       L.circleMarker([lat, lng], {radius:6, color:'#a8321f', fillOpacity:.7})
-        .bindPopup(`<b>${esc(n)}</b><br>${esc(el.tags['name:en'] || '')}<br><a href="${link}" target="_blank" rel="noopener">OSM 詳情</a>`)
+        .bindPopup(`<b>${esc(el.tags.name)}</b><br>${esc(el.tags['name:en'] || '')}<br><a href="https://www.openstreetmap.org/${el.type}/${el.id}" target="_blank" rel="noopener">OSM 詳情</a>`)
         .addTo(osmLayer);
     });
-    osmLayer.addTo(map);
-    st.textContent = `已顯示 ${osmLayer.getLayers().length} 間`;
-  } catch (err) { st.textContent = '載入失敗，請稍後再試'; e.target.checked = false; }
+    stEl.textContent = `已載入 ${seen.size} 間（移動地圖會自動補載）`;
+  } catch (err) {
+    const why = err.errors ? err.errors.map(x => x.message).join(' / ') : err.message;
+    stEl.textContent = '載入失敗：' + why + '（稍後再試）';
+  }
+  loading = false;
+}
+map.on('moveend', () => { clearTimeout(timer); timer = setTimeout(loadView, 600); });
+document.getElementById('osmToggle').onchange = e => {
+  osmOn = e.target.checked;
+  if (osmOn) { osmLayer.addTo(map); if (map.getZoom() < 12) map.setZoom(13); loadView(); }
+  else { map.removeLayer(osmLayer); stEl.textContent = '已隱藏'; }
 };
 
 function show(t) {
