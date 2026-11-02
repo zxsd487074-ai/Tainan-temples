@@ -50,10 +50,16 @@ document.getElementById('osmToggle').onchange = async e => {
   if (!e.target.checked) { if (osmLayer) map.removeLayer(osmLayer); st.textContent = '已隱藏'; return; }
   if (osmLayer) { osmLayer.addTo(map); st.textContent = '已顯示'; return; }
   st.textContent = '載入中…';
-  const q = '[out:json][timeout:60];area["name"="臺南市"]["boundary"="administrative"]["admin_level"="4"]->.a;nwr(area.a)["amenity"="place_of_worship"]["religion"~"taoist|buddhist|folk"]["name"];out center tags 4000;';
+  const q = '[out:json][timeout:25];nwr["amenity"="place_of_worship"]["religion"~"taoist|buddhist|folk"]["name"](22.88,120.03,23.42,120.66);out center tags qt;';
+  const CK = 'osm-temples-v1';
   try {
-    const r = await fetch('https://overpass-api.de/api/interpreter', {method:'POST', body:'data=' + encodeURIComponent(q)});
-    const d = await r.json();
+    let d = null;
+    try { const c = JSON.parse(localStorage.getItem(CK)); if (c && Date.now() - c.t < 7 * 864e5) d = c.d; } catch (x) {}
+    if (!d) {
+      const eps = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'];
+      d = await Promise.any(eps.map(u => fetch(u, {method:'POST', body:'data=' + encodeURIComponent(q)}).then(r => { if (!r.ok) throw 0; return r.json(); })));
+      try { localStorage.setItem(CK, JSON.stringify({t: Date.now(), d})); } catch (x) {}
+    }
     osmLayer = L.markerClusterGroup({chunkedLoading:true});
     d.elements.forEach(el => {
       const lat = el.lat ?? el.center?.lat, lng = el.lon ?? el.center?.lon;
